@@ -1,4 +1,4 @@
-import { GetContestListParams, R_CC, getContestList, getContestTotalCount, getStatisticsByAccountId } from "../apis";
+import { GetContestListParams, GetProblemListParams, R_CC, getContestList, getContestTotalCount, getProblemList, getProblemsTotalCount, getStatisticsByAccountId } from "../apis";
 import Contest from "../types/Contest";
 import Statistics from "../types/Statistics";
 import { getAlignedOffset } from "../utils/pagination";
@@ -6,11 +6,15 @@ import { loadAllData, openDatabase, saveData } from "./db";
 import { LOCAL_STATISTICS_STRATEGY, StatisticsStrategy, isCacheExpired, touchCache } from "./localstorage";
 import { log } from "../utils/log";
 import { notification } from "antd";
+import Problem from "../types/Problem";
 
 const PAGE_SIZE = 200;
+const PROBLEMS_PAGE_SIZE = 1000;
 const DB_NAME = 'clist-ex';
 export const STORE_LC = 'contest-lc';
 export const STORE_CC = 'contest-cc';
+export const PROBLEMS_CC = 'problems-cc';
+export const PROBLEMS_LC = 'problems-lc';
 
 function createObjectStorePromise(db: IDBDatabase, name: string, options?: IDBObjectStoreParameters) {
     return new Promise<void>((resolve, reject) => {
@@ -33,8 +37,70 @@ function openClistExDatabase() {
             createObjectStorePromise(db, STORE_CC, {
                 keyPath: 'id',
             }),
+            createObjectStorePromise(db, PROBLEMS_CC, {
+                keyPath: 'id',
+                autoIncrement: true
+            }),
+            createObjectStorePromise(db, PROBLEMS_LC, {
+                keyPath: 'id',
+                autoIncrement: true
+            }),
         ])
     });
+}
+
+export async function loadProblemsList(resource: string) {
+    const db = await openClistExDatabase();
+    const params: GetProblemListParams = {
+        resource,
+        total_count: "true",
+        order_by: "id",
+        limit: PROBLEMS_PAGE_SIZE,
+    };
+
+    let storeName = PROBLEMS_LC;
+    if (resource === R_CC) {
+        storeName = PROBLEMS_CC;
+        // bad regex makes api returns slower
+        // params.event__regex = '^(CodeChef )?Starters';
+    }
+
+    let cacheProblems = await loadAllData<Problem[]>(db, storeName);
+    if (!isCacheExpired(storeName)) {
+        cacheProblems.sort((a, b) => a.rating - b.rating);
+        return cacheProblems;
+    }
+
+    const cacheProblemIds = cacheProblems.map(c => c.id);
+    const totalCount = await getProblemsTotalCount(params) || 0;
+    params.offset = getAlignedOffset(cacheProblems.length, PROBLEMS_PAGE_SIZE);
+    let fetchedCount = 0;
+    while (params.offset < totalCount) {
+        notification.info({
+            message: `loading problem ${params.offset}/${totalCount}`,
+        });
+        const fetchedProblems = await getProblemList(params);
+        if (!fetchedProblems.length) break;
+
+        for (const c of fetchedProblems) {
+            fetchedCount++;
+            const index = cacheProblemIds.indexOf(c.id);
+            if (index >= 0) {
+                cacheProblems[index] = c;
+            } else {
+                cacheProblems.push(c);
+            }
+            saveData(db, storeName, c);
+        }
+        params.offset += PROBLEMS_PAGE_SIZE;
+    }
+    if (fetchedCount) {
+        touchCache(storeName);
+    }
+    log(`[service] loadProblemsList: fetchedCount=${fetchedCount}.`);
+
+    cacheProblems.sort((a, b) => a.rating - b.rating);
+    return cacheProblems;
 }
 
 export async function loadContestList(resource: string) {

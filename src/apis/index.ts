@@ -72,6 +72,11 @@ export interface GetContestListParams extends PaginationParams {
     with_problems?: BoolString;
     order_by?: 'id' | '-id' | 'start' | '-start';
 }
+export interface GetProblemListParams extends PaginationParams {
+    resource: string;
+    total_count?: BoolString;
+    order_by?: 'rating' | '-rating' | 'n_accepted' | '-n_accepted' | 'id';
+}
 async function getRawContestList(params: GetContestListParams) {
     try {
         return client.get<ListResponse<Contest<any>>>('/contest/', {
@@ -92,17 +97,19 @@ export async function getContestTotalCount(resource: string, event__regex?: stri
     });
     return res?.data.meta.total_count;
 }
+export async function getProblemsTotalCount(params: GetProblemListParams) {
+    const res = await client.get<ListResponse<Problem>>('/problem/', {
+        params
+    });
+    return res?.data.meta.total_count;
+}
 export async function getContestList(params: GetContestListParams) {
     return extractList(getRawContestList(params));
 }
 
-export function getProblemList(resource: string) {
+export function getProblemList(params: GetProblemListParams) {
     return extractList(client.get<ListResponse<Problem>>('/problem/', {
-        params: {
-            resource,
-            order_by: '-id',
-            limit: 50,
-        },
+        params
     }));
 }
 

@@ -5,6 +5,7 @@ import { Card, Layout, Menu } from 'antd';
 import { ProblemPage } from './pages/ProblemPage';
 import { AboutPage } from './pages/AboutPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { AllProblems } from './pages/AllProblems';
 
 const { Header, Content, Footer } = Layout
 
@@ -23,6 +24,7 @@ function App() {
                 mode="horizontal"
                 items={[
                     { key: 'problems', label: 'Problems' },
+                    { key: 'contests', label: 'Contests' },
                     { key: 'github', label: <a href="https://github.com/chinesedfan/clist-ex" target="_blank">Github</a> },
                     { key: 'settings', label: 'Settings' },
                     { key: 'about', label: 'About' },
@@ -32,9 +34,10 @@ function App() {
         </Header>
         <Content style={{ padding: '30px 48px' }}>
             <Card>
-                { current === 'problems' && <ProblemPage></ProblemPage> }
+                { current === 'problems' && <AllProblems></AllProblems> }
                 { current === 'settings' && <SettingsPage></SettingsPage> }
                 { current === 'about' && <AboutPage></AboutPage> }
+                { current === 'contests' && <ProblemPage></ProblemPage> }
             </Card>
         </Content>
         <Footer style={{ textAlign: 'center' }}>
